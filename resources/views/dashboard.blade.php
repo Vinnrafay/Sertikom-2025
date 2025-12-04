@@ -123,6 +123,73 @@
                     </tbody>
 
                 </table>
+               <!-- Pagination -->
+@if ($siswaBaru->hasPages())
+    <div class="mt-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4">
+
+        {{-- Info --}}
+        <div class="text-gray-600 text-sm">
+            Menampilkan
+            <span class="font-semibold">{{ $siswaBaru->firstItem() }}</span>
+            sampai
+            <span class="font-semibold">{{ $siswaBaru->lastItem() }}</span>
+            dari
+            <span class="font-semibold">{{ $siswaBaru->total() }}</span>
+            data
+        </div>
+
+        {{-- Links --}}
+        <div class="flex items-center gap-2">
+
+            {{-- Previous --}}
+            @if ($siswaBaru->onFirstPage())
+                <span class="px-3 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm cursor-not-allowed">
+                    <i class="fa-solid fa-angle-left"></i>
+                </span>
+            @else
+                <a href="{{ $siswaBaru->previousPageUrl() }}"
+                   class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                    <i class="fa-solid fa-angle-left"></i>
+                </a>
+            @endif
+
+            {{-- Page Numbers --}}
+            @php
+                $start = max($siswaBaru->currentPage() - 2, 1);
+                $end   = min($siswaBaru->currentPage() + 2, $siswaBaru->lastPage());
+            @endphp
+
+            @for ($page = $start; $page <= $end; $page++)
+                @if ($page == $siswaBaru->currentPage())
+                    <span class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">
+                        {{ $page }}
+                    </span>
+                @else
+                    <a href="{{ $siswaBaru->url($page) }}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+                        {{ $page }}
+                    </a>
+                @endif
+            @endfor
+
+            {{-- Next --}}
+            @if ($siswaBaru->hasMorePages())
+                <a href="{{ $siswaBaru->nextPageUrl() }}"
+                   class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                    <i class="fa-solid fa-angle-right"></i>
+                </a>
+            @else
+                <span class="px-3 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm cursor-not-allowed">
+                    <i class="fa-solid fa-angle-right"></i>
+                </span>
+            @endif
+
+        </div>
+
+    </div>
+@endif
+
+
             </div>
 
         </div>

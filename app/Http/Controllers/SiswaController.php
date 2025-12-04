@@ -11,61 +11,65 @@ use Illuminate\Validation\Rule;
 
 class SiswaController extends Controller
 {
-   public function index(Request $request)
-{
-    $query = Siswa::query()->with(['kelasAktif.kelas.jurusan', 'kelasAktif.tahunAjar']);
+    public function index(Request $request)
+    {
+        $query = Siswa::query()->with(['kelasAktif.kelas.jurusan', 'kelasAktif.tahunAjar']);
 
-    // Search
-    if ($request->filled('search')) {
-        $query->where(function($q) use ($request) {
-            $q->where('nama_lengkap', 'like', '%' . $request->search . '%')
-              ->orWhere('nisn', $request->search);
-        });
+        // Search
+        if ($request->filled('search')) {
+            $query->where(function($q) use ($request) {
+                $q->where('nama_lengkap', 'like', '%' . $request->search . '%')
+                  ->orWhere('nisn', $request->search);
+            });
+        }
+
+        // Filter jurusan
+        if ($request->filled('jurusan_id')) {
+            $query->whereHas('kelasAktif.kelas', fn($q) =>
+                $q->where('jurusan_id', $request->jurusan_id)
+            );
+        }
+
+        // Filter kelas
+        if ($request->filled('kelas_id')) {
+            $query->whereHas('kelasAktif', fn($q) =>
+                $q->where('kelas_id', $request->kelas_id)
+            );
+        }
+
+        /** =====================================
+         * PAGINATION & DROPDOWN FIX
+         * =================================== */
+
+        // Ambil data tabel pakai pagination
+        // ->withQueryString() = supaya page tetap ikut filter
+        $data = $query
+            ->orderBy('nama_lengkap')
+            ->paginate(7)
+            ->withQueryString();
+
+        // Dropdown jurusan
+        $jurusan = \App\Models\Jurusan::orderBy('nama_jurusan')->get();
+
+        // Dropdown kelas (auto filter sesuai jurusan)
+        $kelas = Kelas::with('jurusan')
+            ->when($request->filled('jurusan_id'), function ($q) use ($request) {
+                $q->where('jurusan_id', $request->jurusan_id);
+            })
+            ->orderBy('level_kelas')
+            ->orderBy('nama_kelas')
+            ->get();
+
+        // Dropdown tahun ajar (kalau nanti dipakai)
+        $tahunAjars = TahunAjar::orderBy('nama_tahun_ajar')->get();
+
+        return view('siswa.index', [
+            'data'       => $data,
+            'kelas'      => $kelas,
+            'jurusan'    => $jurusan,
+            'tahunAjars' => $tahunAjars,
+        ]);
     }
-
-    // Filter jurusan
-    if ($request->filled('jurusan_id')) {
-        $query->whereHas('kelasAktif.kelas', fn($q) => 
-            $q->where('jurusan_id', $request->jurusan_id)
-        );
-    }
-
-    // Filter kelas
-    if ($request->filled('kelas_id')) {
-        $query->whereHas('kelasAktif', fn($q) =>
-            $q->where('kelas_id', $request->kelas_id)
-        );
-    }
-
-    // ======== NEW FIX START ======== //
-
-    // Data tabel
-    $data = $query->latest()->paginate(15)->withQueryString();
-
-    // Semua jurusan untuk dropdown
-    $jurusan = \App\Models\Jurusan::orderBy('nama_jurusan')->get();
-
-    // Dropdown kelas otomatis filter sesuai jurusan terpilih
-    $kelas = Kelas::with('jurusan')
-        ->when($request->filled('jurusan_id'), function ($q) use ($request) {
-            $q->where('jurusan_id', $request->jurusan_id);
-        })
-        ->orderBy('level_kelas')
-        ->get();
-
-    // Tahun ajar kalau nanti mau dipakai
-    $tahunAjars = TahunAjar::orderBy('nama_tahun_ajar')->get();
-
-    // Return ke blade
-    return view('siswa.index', [
-        'data'       => $data,
-        'kelas'      => $kelas,
-        'jurusan'    => $jurusan,
-        'tahunAjars' => $tahunAjars,
-    ]);
-
-    // ======== NEW FIX END ======== //
-}
 
 
     public function create()
@@ -126,7 +130,6 @@ class SiswaController extends Controller
         return view('siswa.show', compact('siswa', 'kelas', 'tahunAjar', 'riwayat'));
     }
 
-
     public function edit(Siswa $siswa)
     {
         $kelas = Kelas::with('jurusan')->get();
@@ -172,7 +175,6 @@ class SiswaController extends Controller
         return redirect()->route('siswa.index')->with('success', 'Data siswa berhasil diperbarui!');
     }
 
-
     public function destroy(Siswa $siswa)
     {
         $siswa->kelasDetails()->delete();
@@ -181,48 +183,41 @@ class SiswaController extends Controller
         return back()->with('success', 'Siswa berhasil dihapus!');
     }
 
+    public function updateKelas(Request $request, Siswa $siswa)
+    {
+        $request->validate([
+            'kelas_id' => 'required|exists:kelas,id',
+            'tahun_ajar_id' => 'required|exists:tahun_ajars,id'
+        ]);
 
-    // Update kelas melalui halaman show
- public function updateKelas(Request $request, Siswa $siswa)
-{
-    $request->validate([
-        'kelas_id' => 'required|exists:kelas,id',
-        'tahun_ajar_id' => 'required|exists:tahun_ajars,id'
-    ]);
+        $current = $siswa->kelasAktif;
 
-    $current = $siswa->kelasAktif;
+        if ($current &&
+            $current->kelas_id == $request->kelas_id &&
+            $current->tahun_ajar_id == $request->tahun_ajar_id) {
+            return back()->with('info', 'Tidak ada perubahan data.');
+        }
 
-    // Kalo ga ada perubahan. diemin aja
-    if ($current &&
-        $current->kelas_id == $request->kelas_id &&
-        $current->tahun_ajar_id == $request->tahun_ajar_id) {
-        return back()->with('info', 'Tidak ada perubahan data.');
+        $sudahPernah = $siswa->kelasDetails()
+            ->where('kelas_id', $request->kelas_id)
+            ->where('tahun_ajar_id', $request->tahun_ajar_id)
+            ->exists();
+
+        if ($sudahPernah) {
+            return back()->with('error', 'Tidak bisa mengubah siswa ke kelas & tahun ajar yang sudah pernah digunakan sebelumnya.');
+        }
+
+        if ($current) {
+            $current->update(['status' => 'nonaktif']);
+        }
+
+        KelasDetail::create([
+            'siswa_id' => $siswa->id,
+            'kelas_id' => $request->kelas_id,
+            'tahun_ajar_id' => $request->tahun_ajar_id,
+            'status' => 'aktif',
+        ]);
+
+        return back()->with('success', 'Kelas & Tahun Ajar berhasil diperbarui.');
     }
-
-    //  Ngecek apakah data kelas lama sudah pernah dipakai
-    $sudahPernah = $siswa->kelasDetails()
-        ->where('kelas_id', $request->kelas_id)
-        ->where('tahun_ajar_id', $request->tahun_ajar_id)
-        ->exists();
-
-    if ($sudahPernah) {
-        return back()->with('error', 'Tidak bisa mengubah siswa ke kelas & tahun ajar yang sudah pernah digunakan sebelumnya.');
-    }
-
-    // Nonaktifkan kelas aktif sebelumnya
-    if ($current) {
-        $current->update(['status' => 'nonaktif']);
-    }
-
-    // Buat kelas-detail baru
-    KelasDetail::create([
-        'siswa_id' => $siswa->id,
-        'kelas_id' => $request->kelas_id,
-        'tahun_ajar_id' => $request->tahun_ajar_id,
-        'status' => 'aktif',
-    ]);
-
-    return back()->with('success', 'Kelas & Tahun Ajar berhasil diperbarui.');
-}
-
 }

@@ -16,7 +16,10 @@ class DashboardController extends Controller
                 'totalKelas'   => Kelas::count(),
                 'totalJurusan' => Jurusan::count(),
                 'totalTahun'   => TahunAjar::count(),
-                'siswaBaru'    => Siswa::latest()->take(5)->get(),
+                'siswaBaru' => Siswa::with(['kelasAktif.kelas.jurusan'])
+            ->latest()
+            ->paginate(5)     
+            ->withQueryString(),   
         ]);
     }
 }

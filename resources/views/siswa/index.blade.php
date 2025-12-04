@@ -142,8 +142,69 @@
         </div>
 
         <!-- Pagination -->
-        <div class="mt-6">
-            {{ $data->appends(request()->query())->links() }}
+@if ($data->hasPages())
+    <div class="mt-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
+        {{-- Info --}}
+        <div class="text-gray-600 text-sm">
+            Menampilkan 
+            <span class="font-semibold">{{ $data->firstItem() }}</span> 
+            sampai 
+            <span class="font-semibold">{{ $data->lastItem() }}</span> 
+            dari 
+            <span class="font-semibold">{{ $data->total() }}</span> data
         </div>
+
+        {{-- Pagination Links --}}
+        <div class="flex items-center gap-2">
+
+            {{-- Previous --}}
+            @if ($data->onFirstPage())
+                <span class="px-3 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm cursor-not-allowed">
+                    <i class="fa-solid fa-angle-left"></i>
+                </span>
+            @else
+                <a href="{{ $data->previousPageUrl() }}{{ request()->getQueryString() ? '&'.request()->getQueryString() : '' }}"
+                   class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                    <i class="fa-solid fa-angle-left"></i>
+                </a>
+            @endif
+
+            {{-- Numbered Pages --}}
+            @php
+                $start = max($data->currentPage() - 2, 1);
+                $end   = min($data->currentPage() + 2, $data->lastPage());
+            @endphp
+
+            @for ($page = $start; $page <= $end; $page++)
+                @if ($page == $data->currentPage())
+                    <span class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold">
+                        {{ $page }}
+                    </span>
+                @else
+                    <a href="{{ $data->url($page) }}{{ request()->getQueryString() ? '&'.request()->getQueryString() : '' }}"
+                       class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+                        {{ $page }}
+                    </a>
+                @endif
+            @endfor
+
+            {{-- Next --}}
+            @if ($data->hasMorePages())
+                <a href="{{ $data->nextPageUrl() }}{{ request()->getQueryString() ? '&'.request()->getQueryString() : '' }}"
+                   class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                    <i class="fa-solid fa-angle-right"></i>
+                </a>
+            @else
+                <span class="px-3 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm cursor-not-allowed">
+                    <i class="fa-solid fa-angle-right"></i>
+                </span>
+            @endif
+        </div>
+
+    </div>
+@endif
+
+
     </div>
 </x-app-layout>
